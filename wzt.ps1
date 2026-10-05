@@ -1,7 +1,7 @@
-# swaps the theme in wezterm, nvim, oh-my-posh and claude code at once. a theme
-# is a json file, wzt copies the one you pick to current.json, which
+# swaps the theme in wezterm, nvim, oh-my-posh, yazi and claude code at once. a
+# theme is a json file, wzt copies the one you pick to current.json, which
 # .wezterm.lua, nvim's config/theme.lua and the shells read. running nvims get
-# told over their pipes
+# told over their pipes, yazi gets the theme's theme.toml copied in
 param(
   [Parameter(Position = 0)] [string] $Cmd,
   [Parameter(Position = 1)] [string] $Name
@@ -11,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 $root = $env:WZT_DIR ?? "$HOME\.config\wezterm\themes"
 $current = Join-Path $root 'current.json'
 $claude = "$HOME\.claude\settings.json"
+$yazi = Join-Path ($env:YAZI_CONFIG_HOME ?? "$env:APPDATA\yazi\config") 'theme.toml'
 
 function Get-Theme($n) {
   $f = Join-Path $root "$n.json"
@@ -39,8 +40,10 @@ function Set-ClaudeTheme($value) {
 function Apply {
   $t = Get-Theme $Name
   $t | Add-Member name $Name -Force
-  # wezterm watches this file and reloads on its own
   $t | ConvertTo-Json | Set-Content $current
+  # wezterm doesnt always see current.json change, it does see its own config
+  $wezcfg = $env:WEZTERM_CONFIG_FILE ?? "$HOME\.wezterm.lua"
+  if (Test-Path $wezcfg) { (Get-Item $wezcfg).LastWriteTime = Get-Date }
 
   $n = 0
   foreach ($s in Get-Nvims) {
@@ -48,6 +51,8 @@ function Apply {
     $n++
   }
   Set-ClaudeTheme $t.claude
+  # yazi has no include, so each theme keeps a whole theme.toml
+  if ($t.yazi -and (Test-Path $t.yazi)) { Copy-Item $t.yazi $yazi -Force }
   "switched to $Name, $n nvim"
 }
 
@@ -63,6 +68,11 @@ function Save {
   if ((Test-Path $claude) -and (Get-Content $claude -Raw) -match '"theme"\s*:\s*"([^"]*)"') {
     $t | Add-Member claude $Matches[1] -Force
   }
+  if (Test-Path $yazi) {
+    $y = Join-Path $root "$Name.yazi.toml"
+    Copy-Item $yazi $y -Force
+    $t | Add-Member yazi $y.Replace('\', '/') -Force
+  }
 
   $f = Join-Path $root "$Name.json"
   $existed = Test-Path $f
@@ -76,7 +86,7 @@ function Rows {
   foreach ($n in Get-Themes) {
     $t = Get-Theme $n
     $bg = if ($t.background) { Split-Path $t.background -Leaf } else { 'no image' }
-    '{0} {1,-14} wezterm {2,-10} nvim {3,-10} {4}' -f (($n -eq $on) ? '*' : ' '), $n, $t.wezterm, $t.nvim, $bg
+    '{0} {1,-10} wezterm {2,-24} nvim {3,-11} {4}' -f (($n -eq $on) ? '*' : ' '), $n, $t.wezterm, $t.nvim, $bg
   }
 }
 
@@ -135,7 +145,7 @@ switch ($Cmd) {
   { $_ -in 'help', '-h', '--help' } {
     'wzt                 pick a theme'
     'wzt <name>          switch to it'
-    'wzt save <name>     save what nvim and claude code are using now as a theme'
+    'wzt save <name>     save what nvim, yazi and claude code are using now as a theme'
     'wzt ls              list themes, * is the one in use'
     'wzt rm [name]       remove one'
   }

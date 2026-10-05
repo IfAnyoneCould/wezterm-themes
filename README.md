@@ -1,6 +1,6 @@
 # wezterm-themes
 
-Swaps the theme in wezterm, nvim, oh-my-posh and claude code at once.
+Swaps the theme in wezterm, nvim, oh-my-posh, yazi and claude code at once.
 
 ## Setup
 
@@ -25,7 +25,7 @@ For the prompt, `.zshrc` sets `POSH_THEME` from it before every prompt (zsh's `m
 ```
 wzt               # pick a theme
 wzt <name>        # switch to it
-wzt save <name>   # save what nvim and claude code are using now as a theme
+wzt save <name>   # save what nvim, yazi and claude code are using now as a theme
 wzt ls            # * is the one in use
 wzt rm [name]
 ```
@@ -44,7 +44,8 @@ Themes go in `~\.config\wezterm\themes\<name>.json`, or `$env:WZT_DIR`.
   "saturation": 1.0,
   "nvim": "nord",
   "claude": "custom:nord",
-  "omp": "C:/Users/JonahW/.ohmyposhconfigs/icecave.omp.json"
+  "omp": "C:/Users/JonahW/.ohmyposhconfigs/icecave.omp.json",
+  "yazi": "C:/Users/JonahW/.config/wezterm/themes/icecave.yazi.toml"
 }
 ```
 
@@ -52,15 +53,17 @@ Themes go in `~\.config\wezterm\themes\<name>.json`, or `$env:WZT_DIR`.
 - `nvim` is a colorscheme, its plugin has to be in the nvim config
 - `claude` goes into the `theme` in `~/.claude/settings.json`, custom ones live in `~/.claude/themes`
 - `omp` is an oh-my-posh config
+- `yazi` is a whole `theme.toml`, copied over yazi's. yazi has no include, and an `[icon]` list in `theme.toml` beats the flavor's, so each theme keeps its own file. flavors go in with `ya pkg add`
 - leave out `background` for no image
 
 ## How it works
 
-- picking a theme copies it to `current.json`, wezterm reloads on its own
+- picking a theme copies it to `current.json` and touches `.wezterm.lua`, wezterm doesn't always notice `current.json` changing on its own
 - every nvim listening on a pipe gets `:colorscheme` sent to it, new ones read `current.json` on startup
 - omp reads `POSH_THEME` on every prompt, so open zsh shells switch on their next prompt. pwsh only picks it up in new shells
-- `save` starts from `current.json` and takes the colorscheme from a running nvim and the theme from claude's settings
+- `save` starts from `current.json` and takes the colorscheme from a running nvim, yazi's `theme.toml` and the theme from claude's settings
 
 ## Notes
 
 - wsl nvims aren't switched
+- an open yazi keeps its old theme until it's restarted
