@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# runs wzt.ps1 from wsl. also switches the nvims in this distro, wzt.ps1 runs
+# _nvim in each running distro since windows cant reach their sockets
+set -euo pipefail
+here=$(dirname "$(readlink -f "$0")")
+PATH=$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH
+
+nvims() {
+  local scheme=$1 nv s n=0
+  # the mise shim costs a startup per call, so go straight to the binary
+  nv=$(mise which nvim 2>/dev/null || command -v nvim) || { echo 0; return; }
+  for s in "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"/nvim.*; do
+    [ -S "$s" ] || continue
+    "$nv" --headless --server "$s" --remote-expr "execute('colorscheme $scheme')" >/dev/null 2>&1 && n=$((n + 1))
+  done
+  echo $n
+}
+
+case ${1:-} in
+  _nvim) nvims "$2" ;;
+  *) exec pwsh.exe -NoProfile -File "$(wslpath -w "$here/wzt.ps1")" "$@" ;;
+esac

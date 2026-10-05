@@ -30,6 +30,23 @@ function Get-Nvims { [IO.Directory]::GetFiles('\\.\pipe\') -like '*nvim*' }
 
 function Nvim-Expr($server, $expr) { nvim --headless --server $server --remote-expr $expr 2>$null }
 
+# C:\x -> /mnt/c/x
+function To-Wsl($path) { '/mnt/' + $path.Substring(0, 1).ToLower() + $path.Substring(2).Replace('\', '/') }
+
+# windows cant reach a wsl nvim's socket, so ./wzt _nvim does it from inside
+# each running distro. distros that aren't running are left alone, their nvims
+# read current.json when they start
+function Set-WslNvims($scheme) {
+  if (-not $scheme -or -not (Get-Command wsl.exe -ErrorAction Ignore)) { return 0 }
+  $env:WSL_UTF8 = 1
+  $n = 0
+  foreach ($d in wsl.exe -l --running -q | ? { $_ -and $_ -notlike 'docker-desktop*' }) {
+    $out = wsl.exe -d $d -e bash (To-Wsl "$PSScriptRoot\wzt") _nvim $scheme 2>$null
+    if ($out -match '^\d+$') { $n += [int]$out }
+  }
+  $n
+}
+
 function Get-Current { if (Test-Path $current) { (Get-Content $current -Raw | ConvertFrom-Json).name } }
 
 # keeps the rest of settings.json as it is, ConvertTo-Json would reformat all of it
@@ -63,11 +80,12 @@ function Apply {
     Nvim-Expr $s "execute('colorscheme $($t.nvim)')" | Out-Null
     $n++
   }
+  $w = Set-WslNvims $t.nvim
   Set-ClaudeTheme $t.claude
   # yazi has no include, so each theme keeps a whole theme.toml
   if ($t.yazi -and (Test-Path $t.yazi)) { Copy-Item $t.yazi $yazi -Force }
   Set-BtopTheme $t.btop
-  "switched to $Name, $n nvim"
+  "switched to $Name, $n nvim, $w wsl nvim"
 }
 
 # the current theme with whatever nvim and claude code are actually using now

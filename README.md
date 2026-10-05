@@ -16,6 +16,12 @@ In `.zshrc`:
 alias wzt='pwsh -NoLogo -NoProfile -File ~/Projects/wezterm-themes/wzt.ps1'
 ```
 
+In wsl:
+
+```bash
+ln -s /mnt/c/Users/JonahW/Projects/wezterm-themes/wzt ~/.local/bin/wzt
+```
+
 `.wezterm.lua` reads `~/.config/wezterm/themes/current.json` and watches it, and nvim's `lua/config/theme.lua` reads the colorscheme out of it.
 
 For the prompt, `.zshrc` sets `POSH_THEME` from it before every prompt (zsh's `mapfile`, no fork) and the pwsh profile passes it to `oh-my-posh init`.
@@ -65,9 +71,14 @@ Themes go in `~\.config\wezterm\themes\<name>.json`, or `$env:WZT_DIR`.
 - omp reads `POSH_THEME` on every prompt, so open zsh shells switch on their next prompt. pwsh only picks it up in new shells
 - `save` starts from `current.json` and takes the colorscheme from a running nvim, yazi's `theme.toml` and the theme from claude's settings
 
+## WSL
+
+- nvim, yazi and claude code's settings are symlinked to the windows ones, so they follow on their own. nvim's `config/theme.lua` reads the windows `current.json` when it's in wsl, and `~/.claude/themes` is a symlink too
+- wsl's `.zshrc` has the same `POSH_THEME` hook pointed at `/mnt/c/...`, and lines btop's `color_theme` up with the theme when a shell starts, since wsl's btop has its own config
+- running wsl nvims get switched by `./wzt _nvim`, which `wzt.ps1` runs in each running distro. `./wzt` is also the wsl command, it just runs `wzt.ps1` through `pwsh.exe`
+
 ## Notes
 
-- wsl nvims aren't switched
 - an open yazi keeps its old theme until it's restarted
 - btop writes its whole config back when it quits, so an open btop puts its old theme back. wzt warns about it
-- wsl's btop isn't switched
+- wsl's btop only picks a switch up in the next shell
