@@ -1,7 +1,8 @@
-# swaps the theme in wezterm, nvim, oh-my-posh, yazi and claude code at once. a
-# theme is a json file, wzt copies the one you pick to current.json, which
-# .wezterm.lua, nvim's config/theme.lua and the shells read. running nvims get
-# told over their pipes, yazi gets the theme's theme.toml copied in
+# swaps the theme in wezterm, nvim, oh-my-posh, yazi, btop and claude code at
+# once. a theme is a json file, wzt copies the one you pick to current.json,
+# which .wezterm.lua, nvim's config/theme.lua and the shells read. running nvims
+# get told over their pipes, yazi gets the theme's theme.toml copied in and
+# btop's color_theme gets pointed at the theme's
 param(
   [Parameter(Position = 0)] [string] $Cmd,
   [Parameter(Position = 1)] [string] $Name
@@ -12,6 +13,8 @@ $root = $env:WZT_DIR ?? "$HOME\.config\wezterm\themes"
 $current = Join-Path $root 'current.json'
 $claude = "$HOME\.claude\settings.json"
 $yazi = Join-Path ($env:YAZI_CONFIG_HOME ?? "$env:APPDATA\yazi\config") 'theme.toml'
+# scoop's btop keeps btop.conf and themes\ next to the exe
+$btop = $env:WZT_BTOP ?? "$HOME\scoop\apps\btop\current\btop.conf"
 
 function Get-Theme($n) {
   $f = Join-Path $root "$n.json"
@@ -37,6 +40,16 @@ function Set-ClaudeTheme($value) {
   $text -replace '"theme"\s*:\s*"[^"]*"', "`"theme`": `"$value`"" | Set-Content $claude -NoNewline
 }
 
+# written in place, scoop hardlinks btop.conf into persist
+function Set-BtopTheme($value) {
+  if (-not $value -or -not (Test-Path $btop)) { return }
+  $file = Join-Path (Split-Path $btop) "themes\$value.theme"
+  if (-not (Test-Path $file)) { Write-Warning "no btop theme $file"; return }
+  (Get-Content $btop -Raw) -replace '(?m)^color_theme = .*$', "color_theme = `"$file`"" | Set-Content $btop -NoNewline
+  # btop writes its whole config back out when it quits
+  if (Get-Process btop -ErrorAction Ignore) { Write-Warning 'btop is open, quitting it will put its old theme back' }
+}
+
 function Apply {
   $t = Get-Theme $Name
   $t | Add-Member name $Name -Force
@@ -53,6 +66,7 @@ function Apply {
   Set-ClaudeTheme $t.claude
   # yazi has no include, so each theme keeps a whole theme.toml
   if ($t.yazi -and (Test-Path $t.yazi)) { Copy-Item $t.yazi $yazi -Force }
+  Set-BtopTheme $t.btop
   "switched to $Name, $n nvim"
 }
 
@@ -67,6 +81,9 @@ function Save {
   }
   if ((Test-Path $claude) -and (Get-Content $claude -Raw) -match '"theme"\s*:\s*"([^"]*)"') {
     $t | Add-Member claude $Matches[1] -Force
+  }
+  if ((Test-Path $btop) -and (Get-Content $btop -Raw) -match '(?m)^color_theme = "([^"]*)"') {
+    $t | Add-Member btop ([IO.Path]::GetFileNameWithoutExtension($Matches[1])) -Force
   }
   if (Test-Path $yazi) {
     $y = Join-Path $root "$Name.yazi.toml"
@@ -145,7 +162,7 @@ switch ($Cmd) {
   { $_ -in 'help', '-h', '--help' } {
     'wzt                 pick a theme'
     'wzt <name>          switch to it'
-    'wzt save <name>     save what nvim, yazi and claude code are using now as a theme'
+    'wzt save <name>     save what nvim, yazi, btop and claude code are using now as a theme'
     'wzt ls              list themes, * is the one in use'
     'wzt rm [name]       remove one'
   }
